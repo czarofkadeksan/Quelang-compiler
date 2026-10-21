@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌀 Quelang Playground</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Consolas', 'Monaco', monospace; background: #0a0a12; color: #e0e0e0; min-height: 100vh; }
+  header { background: linear-gradient(90deg, #000 50%, #1a3a6c 50%); padding: 15px 25px; border-bottom: 3px solid #569cd6; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+  header h1 { font-size: 22px; color: #fff; letter-spacing: 2px; }
+  .version { font-size: 12px; background: #b5e890; color: #000; padding: 2px 8px; border-radius: 10px; font-weight: bold; }
+  .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 15px; height: calc(100vh - 200px); }
+  .left-col { display: flex; flex-direction: column; gap: 15px; }
+  .right-col { display: flex; flex-direction: column; gap: 15px; }
+  .panel { display: flex; flex-direction: column; background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px; overflow: hidden; flex: 1; }
+  .left-col .panel { flex: 1; }
+  .right-col .panel:first-child { flex: 2; }
+  .right-col .panel:last-child { flex: 1; }
+  .panel-header { background: #0e639c; color: #fff; padding: 8px 12px; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+  .panel-body { flex: 1; position: relative; overflow: hidden; }
+  .CodeMirror { position: absolute; top: 0; left: 0; right: 0; bottom: 0; height: auto !important; font-size: 14px; background: #1a1a24 !important; }
+  #input-panel { width: 100%; height: 100%; padding: 12px; background: #1a1a24; color: #fff; border: none; font-family: 'Consolas', monospace; font-size: 14px; resize: none; outline: none; }
+  #output { padding: 12px; font-family: 'Consolas', monospace; font-size: 14px; white-space: pre-wrap; color: #d4d4d4; height: 100%; overflow: auto; }
+  .run-btn { background: #0e639c; color: #fff; border: none; padding: 8px 16px; cursor: pointer; font-size: 13px; font-weight: bold; }
+  .run-btn:hover { background: #1177bb; }
+  .utils { padding: 15px; background: #14141c; border-top: 1px solid #2a2a3a; display: flex; gap: 10px; align-items: center; }
+  .utils select { padding: 8px; background: #1a1a24; color: #fff; border: 1px solid #333; border-radius: 4px; font-family: inherit; flex: 1; }
+  .utils button { background: #b5e890; color: #000; border: none; padding: 8px 16px; cursor: pointer; font-weight: bold; border-radius: 4px; }
+  .cm-s-dracula .cm-keyword { color: #569cd6 !important; font-weight: bold; }
+  .cm-s-dracula .cm-builtin { color: #dcdcaa !important; font-weight: bold; }
+  .cm-s-dracula .cm-variable { color: #9cdcfe !important; }
+  .cm-s-dracula .cm-string { color: #ce9178 !important; }
+  .cm-s-dracula .cm-comment { color: #6a9955 !important; font-style: italic; }
+  .cm-s-dracula .cm-number { color: #b5cea8 !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <span>🌀</span>
+  <h1>QUELANG PLAYGROUND</h1>
+  <span class="version">v0.1.5</span>
+</header>
+
+<div class="main-grid">
+  <div class="left-col">
+    <div class="panel">
+      <div class="panel-header">
+        <span>📝 Quelang Code (.ql)</span>
+        <button class="run-btn" id="run">▶ Run (Ctrl+Enter)</button>
+      </div>
+      <div class="panel-body">
+        <textarea id="editor"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-col">
+    <div class="panel">
+      <div class="panel-header">💻 Output</div>
+      <div class="panel-body">
+        <pre id="output"></pre>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">⌨️ Input (Standard Input)</div>
+      <div class="panel-body">
+        <textarea id="input-panel" placeholder="Type the answers for read() here..."></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="utils">
+  <select id="example-select">
+    <option value="">Load an example...</option>
+    <option value="hello">1. Hello World</option>
+    <option value="variables">2. Variables & Constants</option>
+    <option value="input">3. User Input</option>
+    <option value="fib_builtin">4. Fibonacci (Built-in)</option>
+  </select>
+  <button id="load-btn">Load Example</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/simple.min.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.3/full/pyodide.js"></script>
+
+<script>
+CodeMirror.defineSimpleMode('quelang', {
+  start: [
+    { regex: /\/\/[^\n]*/, token: 'comment' },
+    { regex: /\b(fn|var|con|if|else|while|for|return)\b/, token: 'keyword' },
+    { regex: /\b(put|read|string|int|float|bool|fib)\b/, token: 'builtin' },
+    { regex: /"(?:[^"\\]|\\.)*"/, token: 'string' },
+    { regex: /\b\d+(\.\d+)?\b/, token: 'number' },
+    { regex: /[{}()\[\];,+\-*/=<>!&|.]+/, token: 'operator' },
+    { regex: /[A-Za-z_][A-Za-z0-9_]*/, token: 'variable' }
+  ]
+});
+
+const examples = {
+  hello: `fn main() {\n    put("Hello, World!\\n")\n}`,
+  variables: `fn main() {\n    var name = "Pedro"\n    var age = 11\n    con pi = 3.14\n    put("Name: " + name + "\\n")\n    put("Age: " + age + "\\n")\n}`,
+  input: `fn main() {\n    put("What is your name?\\n")\n    var name = read()\n    put("\\nHello, " + name + "!\\n")\n}`,
+  fib_builtin: `fn main() {\n    put("The 5th Fibonacci number is: ")\n    put(fib(5))\n    put("\\n\\nThe sequence from 1 to 7 is:\\n")\n    put(fib(1..7))\n    put("\\n")\n}`
+};
+
+const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
+  mode: 'quelang', theme: 'dracula', lineNumbers: true, lineWrapping: true, indentUnit: 4
+});
+editor.setValue(examples.fib_builtin);
+
+document.getElementById('load-btn').addEventListener('click', () => {
+  const selected = document.getElementById('example-select').value;
+  if (selected && examples[selected]) {
+    editor.setValue(examples[selected]);
+    document.getElementById('output').textContent = "";
+    document.getElementById('input-panel').value = "";
+  }
+});
+
+function runQuelang(code) {
+  let output = "";
+  let vars = {};
+  let inputText = document.getElementById('input-panel').value;
+  let inputLines = inputText.split('\n');
+  let inputIndex = 0;
+  
+  let cleanCode = code.replace(/\/\/[^\n]*/g, '');
+  if (!cleanCode.includes('fn main')) return "(Quelang needs a 'fn main()' function)";
+
+  let mainMatch = cleanCode.match(/fn\s+main\s*\(\s*\)\s*\{([\s\S]*?)\}$/);
+  if (!mainMatch) return "(Error in main block)";
+  
+  let body = mainMatch[1];
+  let lines = body.split('\n');
+  
+  function executeBlock(start, end) {
+    for (let i = start; i < end; i++) {
+      let line = lines[i].trim();
+      if (!line || line.startsWith('}')) continue;
+
+      let ifMatch = line.match(/^if\s*\((.*)\)\s*\{$/);
+      if (ifMatch) {
+        let cond = evaluate(ifMatch[1], vars);
+        let blockEnd = findClosingBrace(i);
+        let elseLine = blockEnd + 1;
+        while(elseLine < lines.length && !lines[elseLine].trim()) elseLine++;
+        let hasElse = lines[elseLine] && lines[elseLine].trim().startsWith('else');
+        let elseEnd = hasElse ? findClosingBrace(elseLine) : blockEnd;
+
+        if (cond) { executeBlock(i + 1, blockEnd); i = hasElse ? elseEnd : blockEnd; }
+        else if (hasElse) { executeBlock(elseLine + 1, elseEnd); i = elseEnd; }
+        else { i = blockEnd; }
+        continue;
+      }
+
+      let whileMatch = line.match(/^while\s*\((.*)\)\s*\{$/);
+      if (whileMatch) {
+        let condStr = whileMatch[1];
+        let blockEnd = findClosingBrace(i);
+        while (evaluate(condStr, vars)) { executeBlock(i + 1, blockEnd); }
+        i = blockEnd;
+        continue;
+      }
+
+      let varReadMatch = line.match(/^var\s+([A-Za-z_]\w*)\s*=\s*read\s*\(\s*\)$/);
+      if (varReadMatch) {
+        let name = varReadMatch[1];
+        vars[name] = inputLines[inputIndex] !== undefined ? inputLines[inputIndex] : "";
+        inputIndex++;
+        continue;
+      }
+
+      let varMatch = line.match(/^var\s+([A-Za-z_]\w*)\s*=\s*(.+)$/);
+      if (varMatch) { vars[varMatch[1]] = evaluate(varMatch[2], vars); continue; }
+
+      let conMatch = line.match(/^con\s+([A-Za-z_]\w*)\s*=\s*(.+)$/);
+      if (conMatch) { vars[conMatch[1]] = evaluate(conMatch[2], vars); continue; }
+
+      let putMatch = line.match(/^put\s*\((.*)\)$/);
+      if (putMatch) { output += evaluatePrint(putMatch[1], vars); continue; }
+      
+      let incMatch = line.match(/^([A-Za-z_]\w*)\s*(\+\+|--)$/);
+      if (incMatch) {
+        let v = incMatch[1];
+        if (vars[v] !== undefined) {
+            if (incMatch[2] === '++') vars[v] = Number(vars[v]) + 1;
+            else vars[v] = Number(vars[v]) - 1;
+        }
+        continue;
+      }
+
+      let assignMatch = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/);
+      if (assignMatch && !line.startsWith('var')) {
+         vars[assignMatch[1]] = evaluate(assignMatch[2], vars);
+         continue;
+      }
+    }
+  }
+
+  function findClosingBrace(startLine) {
+    let balance = 1;
+    for (let i = startLine + 1; i < lines.length; i++) {
+      let l = lines[i].trim();
+      if (l.endsWith('{')) balance++;
+      if (l === '}' || l.endsWith('}')) balance--;
+      if (balance === 0) return i;
+    }
+    return lines.length;
+  }
+
+  executeBlock(0, lines.length);
+  return output || "(Nothing printed...)";
+}
+
+function evaluate(str, vars) {
+  str = str.trim();
+  for (let v in vars) {
+    let regex = new RegExp('\\b' + v + '\\b', 'g');
+    let val = typeof vars[v] === 'string' ? `"${vars[v]}"` : vars[v];
+    str = str.replace(regex, val);
+  }
+  let fibMatch = str.match(/fib\s*\((\d+)\)/);
+  if (fibMatch) { str = str.replace(fibMatch[0], getFib(parseInt(fibMatch[1]))); }
+  let fibRangeMatch = str.match(/fib\s*\((\d+)\s*\.\.\s*(\d+)\)/);
+  if (fibRangeMatch) {
+    let seq = [];
+    for (let i = parseInt(fibRangeMatch[1]); i <= parseInt(fibRangeMatch[2]); i++) seq.push(getFib(i));
+    return seq.join(', ');
+  }
+  try {
+    if (/^[\d+\-*/.\s()]+$/.test(str)) return eval(str);
+    if (str.includes('>') || str.includes('<') || str.includes('==') || str.includes('!=')) return eval(str);
+    if (str.startsWith('"') && str.endsWith('"')) return str.slice(1, -1).replace(/\\n/g, '\n');
+  } catch (e) { return str; }
+  return str;
+}
+
+function getFib(n) {
+  let a = 0, b = 1, temp;
+  if (n === 1) return 1;
+  if (n === 2) return 1;
+  for (let i = 3; i <= n; i++) { temp = a + b; a = b; b = temp; }
+  return b;
+}
+
+function evaluatePrint(expr, vars) {
+  expr = expr.trim();
+  let evaluated = evaluate(expr, vars);
+  if (typeof evaluated !== 'string' || !evaluated.includes('+')) return String(evaluated);
+  let parts = expr.split('+').map(p => p.trim());
+  let result = "";
+  for (let part of parts) {
+    if (part.startsWith('"') && part.endsWith('"')) result += part.slice(1, -1).replace(/\\n/g, '\n');
+    else if (vars[part] !== undefined) result += vars[part];
+    else result += evaluate(part, vars);
+  }
+  return result;
+}
+
+const outputEl = document.getElementById('output');
+function execute() { outputEl.textContent = runQuelang(editor.getValue()); }
+document.getElementById('run').addEventListener('click', execute);
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); execute(); }
+});
+setTimeout(execute, 500);
+</script>
+</body>
+</html>
