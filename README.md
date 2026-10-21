@@ -1,6 +1,8 @@
 # 🌀 Quelang (The Kadeksan Programming Language)
 
-![Quelang Logo](<img width="475" height="475" alt="Captura de tela 2026-10-21 113231" src="https://github.com/user-attachments/assets/a0122457-87a4-487c-afa3-495d1c2eb05c" />)
+<div align="center">
+  <img width="250" height="250" alt="Quelang Logo" src="https://github.com/user-attachments/assets/a0122457-87a4-487c-afa3-495d1c2eb05c" />
+</div>
 
 **Quelang** is a lightweight, interpreted programming language created by Czar Pedro. It was designed to be simple, fun, and highly extensible, featuring native mathematical functions and a unique syntax inspired by the Kadeksan empire.
 
