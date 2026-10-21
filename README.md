@@ -43,7 +43,8 @@ fn main() {
 ```
 
 ## 💻 How to run it
-Currently, Quelang can be run directly in your browser using our Official Web Playground (Link coming soon!).
+Currently, Quelang can be run directly in your browser using our Official Web Playground: 
+👉 **[Click here to open the Quelang Playground](https://czarofkadeksan.github.io/Quelang-compiler/)**
 
 ## 👑 Author
 Created by **NeuroSpice (Czar Pedro)**.
